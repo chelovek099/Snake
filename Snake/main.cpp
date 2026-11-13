@@ -1,9 +1,17 @@
-#include <SFML/Graphics.hpp>
-#include <SFML/Window.hpp>
-#include <vector>
-#include <iostream>
 #include <cstdlib>
 #include <ctime>
+#include <iostream>
+#include <SFML/Audio.hpp>
+#include <SFML/Graphics.hpp>
+#include <SFML/Window.hpp>
+#include <string>
+#include <vector>
+enum class GameState {
+	Menu,
+	Playing,
+	Gameover,
+	Win
+};
 class Snake {
 private:
 	std::vector<sf::Vector2i> body;
@@ -38,6 +46,16 @@ public:
 		}
 
 
+
+	}
+	bool BodyPossition(sf::Vector2i pos) {
+		for (int i = 0; i < body.size(); i++) {
+			if (body[i] == pos) {
+				return true;
+			}
+
+		}
+		return false;
 
 	}
 	int getLenght() {
@@ -101,47 +119,114 @@ class Game {
 private:
 	sf::RenderWindow window;
 	Snake snake;
-	Food food;
+	std::vector<Food> food;
+
 	int score = 0;
 	sf::Clock clock;
 	bool isGameOver = false;
 	bool isWin = false;
+	sf::Font font;
+
+	sf::Text endText;
+	sf::Text menuText;
+	sf::SoundBuffer buffer;
+	sf::Sound sound;
+	GameState currectState = GameState::Menu;
+
 public:
 
-	Game() : window(sf::VideoMode({ 600 , 600 }), "Snake"), score(0) {
+	Game() : window(sf::VideoMode({ 600 , 600 }), "Snake"), score(0), endText(font), sound(buffer), menuText(font) {
+		if (!font.openFromFile("C:/Windows/Fonts/arial.ttf")) {
+			std::cout << "ОШИБКА: Шрифт не загружен!\n";
+		}
+		if (!buffer.loadFromFile("C:/Windows/Media/tada.wav")) {
+			std::cout << "ОШИБКА: Шрифт не загружен!\n";
+		}
+		for (int i = 0; i < 2; i++) {
+			Food newFood;
+			newFood.respawn(); 
+			food.push_back(newFood); 
+		}
+		GameState currectState = GameState::Menu;
+
 
 		srand(time(0));
-		food.respawn();
+		
+
+	}
+	void endScrean(std::string message, sf::Color color, int score) {
+		sf::RectangleShape overlay(sf::Vector2f({ 600,600 }));
+		overlay.setFillColor(sf::Color(0, 0, 200));
+		window.draw(overlay);
+		endText.setString(message + " Score: " + std::to_string(score) + "\nPress Enter");
+		endText.setFillColor(color);
+		endText.setCharacterSize(30);
+		endText.setPosition({ 150.f,250.f });
+		window.draw(endText);
+}
+	void playSound() {
+		sound.play();
+		
+
 	}
 	
 
+
+
+
 	void run() {
 		while (window.isOpen()) {
+
 			while (const std::optional event = window.pollEvent()) {
+
 				if (event->is<sf::Event::Closed>()) {
-					window.close();
-
-				}
-				if (isGameOver == true) {
 
 					window.close();
+
 				}
-					if (isWin == true) {
-
-						window.close();
-					
-				}
-
-
+if (currectState == GameState::Menu && sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space)) {
+				currectState = GameState::Playing;
 			}
-			input();
-			render();
+}
+
+if (currectState == GameState::Menu) {
+	window.clear(sf::Color::Black);
+	menuText.setString("Press Space " );
+	menuText.setFillColor(sf::Color::White);
+	window.draw(menuText);
+	window.display();
+}
+else if (currectState == GameState::Playing) {
+	input();
+	update();
+	render();
+}
+else if (currectState == GameState::Gameover) {
+	window.clear(sf::Color::Black);
+
+	endScrean("GAME OVER", sf::Color::Red, score);
+	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Enter)) {
+		window.close();
+	}
+	
+	window.display();
+
+}
+else if (currectState == GameState::Win) {
+	window.clear(sf::Color::Black);
+	endScrean("Win", sf::Color::Green, score);
+}
+
+			
 
 
-			update();
+			
+			
+
 		}
 
 	}
+
 
 	void input() {
 		if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up)) {
@@ -175,26 +260,44 @@ public:
 
 			if (snake.getLenght() >= 400) {
 				isWin = true;
+				currectState = GameState::Gameover;
 				std::cout << "Win" << "Счет: " << score << "\n";
 				return;
 			}
 			sf::Vector2i head = snake.getHeadPos();
 			if (head.x < 0 || head.x >= 20 || head.y < 0 || head.y >= 20) {
 				isGameOver = true;
+				currectState = GameState::Gameover;
 				std::cout << "Game over" << "Счет: " << score << "\n";
 				return;
 			}
 			if (snake.сheckCollision()) {
 				isGameOver = true;
+				currectState = GameState::Gameover;
 				std::cout << "Game over" << "Счет: " << score << "\n";
 				return;
 			}
-			if (snake.getHeadPos() == food.getPossition()) {
-				score++;
-				food.respawn();
-				snake.grows();
+			for (int i = 0; i < food.size(); i++) {
 
+				if (snake.getHeadPos() == food[i].getPossition()) {
+					score++;
+
+
+					do {
+
+						food[i].respawn();
+					} while (snake.BodyPossition(food[i].getPossition()));
+
+
+					sound.play();
+					snake.grows();
+				}
 			}
+
+					
+				
+
+			
 			clock.restart();
 		}
 
@@ -215,7 +318,10 @@ public:
 		}
 
 		snake.draw(window);
-		food.draw(window);
+		for(int i = 0; i <food.size();i++){  
+
+		food[i].draw(window);
+}
 		window.display();
 
 	}
